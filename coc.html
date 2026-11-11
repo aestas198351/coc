@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CoC 跑团车卡与联机大厅 - 终极版</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen p-4">
+
+    <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-6">
+        
+        <!-- 左侧第1列：队友状态实时监控面板 -->
+        <div class="space-y-4 flex flex-col">
+            <div class="bg-slate-900 border border-slate-800 p-4 rounded-lg space-y-3 flex-1">
+                <h2 class="text-md font-semibold text-amber-400">👥 队友状态监控 (实时)</h2>
+                <div id="party-list" class="space-y-2 text-xs">
+                    <div class="text-slate-500 text-center py-4">正在连接房间同步...</div>
+                </div>
+            </div>
+
+            <!-- 自定义掷骰栏 (rd100 / 任意骰子) -->
+            <div class="bg-slate-900 border border-slate-800 p-4 rounded-lg space-y-3">
+                <h2 class="text-md font-semibold text-amber-400">🎲 自定义掷骰栏</h2>
+                <div class="text-xs text-slate-400">输入表达式 (如 1d100, 3d6+3):</div>
+                <div class="flex gap-2">
+                    <input type="text" id="custom-dice-expr" value="1d100" class="bg-slate-950 border border-slate-700 px-2 py-1 text-xs rounded flex-1 text-amber-300 font-mono">
+                    <button onclick="rollCustomDice()" class="bg-indigo-600 hover:bg-indigo-500 text-xs px-3 py-1 rounded font-medium cursor-pointer">掷骰</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 中间主要区域：调查员主面板 (占 2 列) -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- 头部信息 -->
+            <header class="flex flex-wrap justify-between items-center border-b border-slate-800 pb-4 gap-4">
+                <div>
+                    <h1 class="text-xl font-bold tracking-wider text-amber-500">克苏鲁的呼唤 - 调查员档案</h1>
+                    <div class="flex items-center space-x-2 mt-1">
+                        <span class="text-sm text-slate-400">调查员：</span>
+                        <input type="text" id="char-name" value="洛夫克拉夫特" oninput="broadcastMyState()" class="bg-slate-900 border border-slate-700 px-2 py-0.5 text-sm rounded text-white font-semibold w-36">
+                    </div>
+                </div>
+                <div class="space-x-2">
+                    <button onclick="switchTab('main')" id="btn-main" class="px-3 py-1.5 bg-amber-600 text-sm font-medium rounded cursor-pointer transition">主面板</button>
+                    <button onclick="switchTab('inventory')" id="btn-inventory" class="px-3 py-1.5 bg-slate-800 text-sm font-medium rounded cursor-pointer transition hover:bg-slate-700">背包武器</button>
+                </div>
+            </header>
+
+            <!-- 主面板 -->
+            <main id="tab-main" class="space-y-6">
+                <!-- 状态值 (HP, MP, SAN, MOV) -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div class="bg-slate-900 border border-slate-800 p-3 rounded-lg text-center space-y-2">
+                        <div class="text-xs text-slate-400">生命值 (HP)</div>
+                        <div class="text-lg font-bold text-red-500 flex justify-center items-center space-x-1">
+                            <input type="number" id="hp-cur" value="12" onchange="broadcastMyState()" class="w-12 bg-slate-950 border border-slate-700 text-center rounded text-red-500 text-sm">
+                            <span>/</span>
+                            <input type="number" id="hp-max" value="12" onchange="broadcastMyState()" class="w-12 bg-slate-950 border border-slate-700 text-center rounded text-slate-400 text-sm">
+                        </div>
+                        <div class="flex justify-center space-x-1">
+                            <button onclick="adjustStat('hp', -1)" class="px-2 bg-slate-800 hover:bg-slate-700 rounded text-xs">-1</button>
+                            <button onclick="adjustStat('hp', 1)" class="px-2 bg-slate-800 hover:bg-slate-700 rounded text-xs">+1</button>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-900 border border-slate-800 p-3 rounded-lg text-center space-y-2">
+                        <div class="text-xs text-slate-400">魔法值 (MP)</div>
+                        <div class="text-lg font-bold text-blue-400 flex justify-center items-center space-x-1">
+                            <input type="number" id="mp-cur" value="10" onchange="broadcastMyState()" class="w-12 bg-slate-950 border border-slate-700 text-center rounded text-blue-400 text-sm">
+                            <span>/</span>
+                            <input type="number" id="mp-max" value="10" onchange="broadcastMyState()" class="w-12 bg-slate-950 border border-slate-700 text-center rounded text-slate-400 text-sm">
+                        </div>
+                        <div class="flex justify-center space-x-1">
+                            <button onclick="adjustStat('mp', -1)" class="px-2 bg-slate-800 hover:bg-slate-700 rounded text-xs">-1</button>
+                            <button onclick="adjustStat('mp', 1)" class="px-2 bg-slate-800 hover:bg-slate-700 rounded text-xs">+1</button>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-900 border border-slate-800 p-3 rounded-lg text-center space-y-2">
+                        <div class="text-xs text-slate-400">理智值 (SAN)</div>
+                        <div class="text-lg font-bold text-purple-400 flex justify-center items-center space-x-1">
+                            <input type="number" id="san-cur" value="70" onchange="broadcastMyState()" class="w-12 bg-slate-950 border border-slate-700 text-center rounded text-purple-400 text-sm">
+                            <span>/</span>
+                            <input type="number" id="san-max" value="99" onchange="broadcastMyState()" class="w-12 bg-slate-950 border border-slate-700 text-center rounded text-slate-400 text-sm">
+                        </div>
+                        <div class="flex justify-center space-x-1">
+                            <button onclick="adjustStat('san', -1)" class="px-2 bg-slate-800 hover:bg-slate-700 rounded text-xs">-1</button>
+                            <button onclick="adjustStat('san', 1)" class="px-2 bg-slate-800 hover:bg-slate-700 rounded text-xs">+1</button>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-900 border border-slate-800 p-3 rounded-lg text-center space-y-2">
+                        <div class="text-xs text-slate-400">移动力 (MOV)</div>
+                        <div class="text-lg font-bold text-green-400 flex justify-center items-center">
+                            <input type="number" id="mov-val" value="8" onchange="broadcastMyState()" class="w-16 bg-slate-950 border border-slate-700 text-center rounded text-green-400 text-sm">
+                        </div>
+                        <button onclick="openSanCheckModal()" class="w-full mt-1 bg-purple-950 hover:bg-purple-900 text-purple-300 border border-purple-800 rounded text-[11px] py-0.5 cursor-pointer">SAN Check</button>
+                    </div>
+                </div>
+
+                <!-- 新增栏：主属性设置面板 (力量、体质、体型、敏捷、外貌、智力、意志、教育、幸运) -->
+                <div class="bg-slate-900 border border-slate-800 p-4 rounded-lg space-y-3">
+                    <h2 class="text-sm font-semibold text-amber-400">调查员主属性</h2>
+                    <div class="grid grid-cols-3 sm:grid-cols-5 gap-2 text-xs">
+                        <div class="bg-slate-950 p-2 rounded border border-slate-800 text-center">
+                            <div class="text-slate-400 text-[10px]">力量 (STR)</div>
+                            <input type="number" id="attr-str" value="50" onchange="broadcastMyState()" class="w-full text-center bg-slate-900 border border-slate-700 rounded mt-1 text-white font-bold">
+                        </div>
+                        <div class="bg-slate-950 p-2 rounded border border-slate-800 text-center">
+                            <div class="text-slate-400 text-[10px]">体质 (CON)</div>
+                            <input type="number" id="attr-con" value="50" onchange="broadcastMyState()" class="w-full text-center bg-slate-900 border border-slate-700 rounded mt-1 text-white font-bold">
+                        </div>
+                        <div class="bg-slate-950 p-2 rounded border border-slate-800 text-center">
+                            <div class="text-slate-400 text-[10px]">体型 (SIZ)</div>
+                            <input type="number" id="attr-siz" value="60" onchange="broadcastMyState()" class="w-full text-center bg-slate-900 border border-slate-700 rounded mt-1 text-white font-bold">
+                        </div>
+                        <div class="bg-slate-950 p-2 rounded border border-slate-800 text-center">
+                            <div class="text-slate-400 text-[10px]">敏捷 (DEX)</div>
+                            <input type="number" id="attr-dex" value="50" onchange="broadcastMyState()" class="w-full text-center bg-slate-900 border border-slate-700 rounded mt-1 text-white font-bold">
+                        </div>
+                        <div class="bg-slate-950 p-2 rounded border border-slate-800 text-center">
+                            <div class="text-slate-400 text-[10px]">外貌 (APP)</div>
+                            <input type="number" id="attr-app" value="50" onchange="broadcastMyState()" class="w-full text-center bg-slate-900 border border-slate-700 rounded mt-1 text-white font-bold">
+                        </div>
+                        <div class="bg-slate-950 p-2 rounded border border-slate-800 text-center">
+                            <div class="text-slate-400 text-[10px]">智力 (INT)</div>
+                            <input type="number" id="attr-int" value="60" onchange="broadcastMyState()" class="w-full text-center bg-slate-900 border border-slate-700 rounded mt-1 text-white font-bold">
+                        </div>
+                        <div class="bg-slate-950 p-2 rounded border border-slate-800 text-center">
+                            <div class="text-slate-400 text-[10px]">意志 (POW)</div>
+                            <input type="number" id="attr-pow" value="70" onchange="broadcastMyState()" class="w-full text-center bg-slate-900 border border-slate-700 rounded mt-1 text-white font-bold">
+                        </div>
+                        <div class="bg-slate-950 p-2 rounded border border-slate-800 text-center">
+                            <div class="text-slate-400 text-[10px]">教育 (EDU)</div>
+                            <input type="number" id="attr-edu" value="70" onchange="broadcastMyState()" class="w-full text-center bg-slate-900 border border-slate-700 rounded mt-1 text-white font-bold">
+                        </div>
+                        <div class="bg-slate-950 p-2 rounded border border-slate-800 text-center">
+                            <div class="text-slate-400 text-[10px]">幸运 (LUCK)</div>
+                            <input type="number" id="attr-luck" value="50" onchange="broadcastMyState()" class="w-full text-center bg-slate-900 border border-slate-700 rounded mt-1 text-white font-bold">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 技能区 -->
+                <div class="bg-slate-900 border border-slate-800 p-4 rounded-lg space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-lg font-semibold text-amber-400">技能鉴定</h2>
+                        <div class="space-x-1 flex">
+                            <input type="text" id="new-skill-name" placeholder="名称" class="bg-slate-950 border border-slate-700 px-2 py-1 text-xs rounded w-20">
+                            <input type="number" id="new-skill-val" placeholder="值" class="bg-slate-950 border border-slate-700 px-2 py-1 text-xs rounded w-14">
+                            <button onclick="addSkill()" class="bg-amber-600 hover:bg-amber-500 text-xs px-2 py-1 rounded cursor-pointer">添加</button>
+                        </div>
+                    </div>
+                    <div id="skills-list" class="divide-y divide-slate-800 max-h-48 overflow-y-auto pr-2 space-y-1"></div>
+                </div>
+            </main>
+
+            <!-- 二级页面：背包 -->
+            <main id="tab-inventory" class="hidden space-y-6">
+                <div class="bg-slate-900 border border-slate-800 p-4 rounded-lg space-y-4">
+                    <h2 class="text-lg font-semibold text-amber-400">背包与武器清单</h2>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="inventory-list"></div>
+                    <div class="pt-4 border-t border-slate-800 flex gap-2">
+                        <input type="text" id="item-name" placeholder="名称" class="bg-slate-950 border border-slate-700 px-2 py-1 text-xs rounded flex-1">
+                        <select id="item-type" class="bg-slate-950 border border-slate-700 px-2 py-1 text-xs rounded text-xs">
+                            <option value="物品">物品</option>
+                            <option value="武器">武器</option>
+                        </select>
+                        <input type="text" id="item-desc" placeholder="说明/伤害" class="bg-slate-950 border border-slate-700 px-2 py-1 text-xs rounded flex-1">
+                        <button onclick="addItem()" class="bg-amber-600 hover:bg-amber-500 text-xs px-3 py-1 rounded cursor-pointer">添加</button>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- 右侧第3列：联机大厅与共享日志 -->
+        <div class="space-y-4 flex flex-col h-full">
+            <div class="bg-slate-900 border border-slate-800 p-4 rounded-lg space-y-3">
+                <h2 class="text-md font-semibold text-amber-400">🌐 多人联机大厅</h2>
+                <div class="text-xs text-slate-400">房间名称：</div>
+                <input type="text" id="room-name-input" value="克苏鲁茶话会" onchange="broadcastMyState()" class="w-full bg-slate-950 border border-slate-700 px-2 py-1 text-xs rounded text-amber-300">
+                
+                <div class="text-xs text-slate-400 pt-1">同步房间暗号（填一样的即可联机）：</div>
+                <div class="flex gap-2">
+                    <input type="text" id="room-code" value="coc-room-888" class="bg-slate-950 border border-slate-700 px-2 py-1 text-xs rounded flex-1 text-amber-300 font-mono">
+                    <button onclick="joinRoom()" class="bg-indigo-600 hover:bg-indigo-500 text-xs px-3 py-1 rounded cursor-pointer">切换房间</button>
+                </div>
+                <div id="connection-status" class="text-xs text-green-400 font-semibold pt-1">状态：已连入同步频道</div>
+            </div>
+
+            <!-- 公共骰子日志 -->
+            <div class="bg-slate-900 border border-slate-800 p-4 rounded-lg flex flex-col flex-1 h-96">
+                <h2 class="text-md font-semibold text-amber-400 mb-2">🎲 共享掷骰日志</h2>
+                <div id="dice-log" class="bg-slate-950 border border-slate-800 p-3 rounded-lg flex-1 overflow-y-auto space-y-2 text-xs font-mono">
+                    <div class="text-slate-500 text-center">--- 房间内的骰子与检定结果会实时显示在这里 ---</div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 弹窗：选择 惩罚骰 / 普通 / 奖励骰 -->
+    <div id="dice-modal" class="hidden fixed inset-0 bg-black/70 flex justify-center items-center z-50">
+        <div class="bg-slate-900 border border-slate-700 p-6 rounded-xl space-y-4 w-80 text-center">
+            <h3 id="modal-title" class="text-lg font-bold text-amber-400">技能鉴定</h3>
+            <p class="text-xs text-slate-400">请选择此次鉴定的骰子类型：</p>
+            <div class="grid grid-cols-3 gap-2 pt-2">
+                <button onclick="executeRoll('penalty')" class="bg-red-950 hover:bg-red-900 border border-red-800 text-red-300 p-2 rounded text-xs font-semibold cursor-pointer">
+                    🔴 惩罚骰<br><span class="text-[9px] text-slate-400">(取最大十位)</span>
+                </button>
+                <button onclick="executeRoll('normal')" class="bg-slate-800 hover:bg-slate-700 text-slate-200 p-2 rounded text-xs font-semibold cursor-pointer">
+                    ⚪ 普通骰<br><span class="text-[9px] text-slate-400">(单颗 1-100)</span>
+                </button>
+                <button onclick="executeRoll('bonus')" class="bg-blue-950 hover:bg-blue-900 border border-blue-800 text-blue-300 p-2 rounded text-xs font-semibold cursor-pointer">
+                    🔵 奖励骰<br><span class="text-[9px] text-slate-400">(取最小十位)</span>
+                </button>
+            </div>
+            <button onclick="closeModal()" class="text-xs text-slate-500 hover:text-slate-300 pt-2 cursor-pointer">取消</button>
+        </div>
+    </div>
+
+    <!-- 弹窗：SAN Check -->
+    <div id="san-modal" class="hidden fixed inset-0 bg-black/70 flex justify-center items-center z-50">
+        <div class="bg-slate-900 border border-slate-700 p-6 rounded-xl space-y-4 w-80 text-center">
+            <h3 class="text-lg font-bold text-purple-400">理智检定 (SAN Check)</h3>
+            <div class="flex gap-2 pt-2">
+                <button onclick="executeSanCheck()" class="flex-1 bg-purple-600 hover:bg-purple-500 text-white py-1.5 rounded text-xs font-semibold cursor-pointer">开始检定 (D100)</button>
+                <button onclick="closeSanModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded text-xs cursor-pointer">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 核心 JS 逻辑 -->
+    <script>
+        let character = {
+            id: 'user_' + Math.random().toString(36).substring(2, 7),
+            name: "洛夫克拉夫特",
+            hp: { cur: 12, max: 12 },
+            mp: { cur: 10, max: 10 },
+            san: { cur: 70, max: 99 },
+            mov: 8,
+            attributes: {
+                str: 50, con: 50, siz: 60, dex: 50, app: 50,
+                int: 60, pow: 70, edu: 70, luck: 50
+            },
+            skills: [
+                { name: "侦查", value: 25 },
+                { name: "图书馆使用", value: 20 },
+                { name: "闪避", value: 40 },
+                { name: "医学", value: 1 }
+            ],
+            inventory: [
+                { name: "手电筒", type: "物品", desc: "照明工具，电池充足" },
+                { name: "M1911 手枪", type: "武器", desc: "伤害: 1d10 | 射程: 15米" }
+            ]
+        };
+
+        let currentRoom = "coc-room-888";
+        let roomName = "克苏鲁茶话会";
+        let activeSkillForRoll = null;
+        let allPartyMembers = {};
+        let eventSource = null;
+
+        // 初始化稳定同步频道 (使用 ntfy 稳定公共中继)
+        function initSyncChannel() {
+            if (eventSource) {
+                eventSource.close();
+            }
+            const channelUrl = `https://ntfy.sh/${currentRoom}/json`;
+            eventSource = new EventSource(channelUrl);
+            
+            eventSource.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    const payload = JSON.parse(data.message);
+                    
+                    if (payload.senderId !== character.id) {
+                        if (payload.type === 'STATE_SYNC') {
+                            allPartyMembers[payload.senderId] = payload.data;
+                            renderPartyList();
+                        } else if (payload.type === 'DICE_LOG') {
+                            appendDiceLogDirect(payload.htmlContent);
+                        }
+                    }
+                } catch(e) {}
+            };
+            
+            document.getElementById('connection-status').innerText = `状态：已连入房间 [${currentRoom}]`;
+            broadcastMyState();
+        }
+
+        function sendPayload(payload) {
+            payload.senderId = character.id;
+            fetch(`https://ntfy.sh/${currentRoom}`, {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            }).catch(err => {});
+        }
+
+        function broadcastMyState() {
+            updateStatsFromDOM();
+            character.name = document.getElementById('char-name').value;
+            roomName = document.getElementById('room-name-input').value;
+            
+            sendPayload({
+                type: 'STATE_SYNC',
+                data: character
+            });
+            render();
+            renderPartyList();
+        }
+
+        function joinRoom() {
+            currentRoom = document.getElementById('room-code').value.trim();
+            if(!currentRoom) return alert("请输入房间暗号！");
+            initSyncChannel();
+            alert("成功切换并加入房间！");
+        }
+
+        // 音效
+        function playDiceSound() {
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(120, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.15);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.15);
+            } catch(e) {}
+        }
+
+        // 渲染主面板
+        function render() {
+            document.getElementById('char-name').value = character.name;
+            document.getElementById('hp-cur').value = character.hp.cur;
+            document.getElementById('hp-max').value = character.hp.max;
+            document.getElementById('mp-cur').value = character.mp.cur;
+            document.getElementById('mp-max').value = character.mp.max;
+            document.getElementById('san-cur').value = character.san.cur;
+            document.getElementById('san-max').value = character.san.max;
+            document.getElementById('mov-val').value = character.mov;
+
+            // 属性
+            document.getElementById('attr-str').value = character.attributes.str;
+            document.getElementById('attr-con').value = character.attributes.con;
+            document.getElementById('attr-siz').value = character.attributes.siz;
+            document.getElementById('attr-dex').value = character.attributes.dex;
+            document.getElementById('attr-app').value = character.attributes.app;
+            document.getElementById('attr-int').value = character.attributes.int;
+            document.getElementById('attr-pow').value = character.attributes.pow;
+            document.getElementById('attr-edu').value = character.attributes.edu;
+            document.getElementById('attr-luck').value = character.attributes.luck;
+
+            // 技能
+            const skillContainer = document.getElementById('skills-list');
+            skillContainer.innerHTML = '';
+            character.skills.forEach((skill, index) => {
+                skillContainer.innerHTML += `
+                    <div class="py-1.5 flex justify-between items-center text-sm">
+                        <div class="flex items-center space-x-2">
+                            <span class="font-medium text-slate-200">${skill.name}</span>
+                            <input type="number" value="${skill.value}" onchange="updateSkillVal(${index}, this.value)" class="w-12 bg-slate-950 border border-slate-700 text-center rounded text-xs text-amber-300">
+                        </div>
+                        <div class="space-x-1">
+                            <button onclick="openRollModal('${skill.name}', ${skill.value})" class="bg-indigo-600 hover:bg-indigo-500 px-2 py-0.5 rounded text-xs font-semibold cursor-pointer">鉴定</button>
+                            <button onclick="deleteSkill(${index})" class="text-slate-500 hover:text-red-400 text-xs px-1 cursor-pointer">×</button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            // 背包
+            const invContainer = document.getElementById('inventory-list');
+            invContainer.innerHTML = '';
+            character.inventory.forEach((item, index) => {
+                invContainer.innerHTML += `
+                    <div class="bg-slate-950 border border-slate-800 p-3 rounded flex justify-between items-start">
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <span class="font-bold text-sm text-slate-200">${item.name}</span>
+                                <span class="text-[10px] px-1.5 py-0.5 rounded ${item.type === '武器' ? 'bg-red-950 text-red-400 border border-red-800' : 'bg-slate-800 text-slate-300'}">${item.type}</span>
+                            </div>
+                            <p class="text-xs text-slate-400 mt-1">${item.desc}</p>
+                        </div>
+                        <button onclick="deleteItem(${index})" class="text-slate-600 hover:text-red-400 text-xs cursor-pointer">×</button>
+                    </div>
+                `;
+            });
+        }
+
+        function updateStatsFromDOM() {
+            character.hp.cur = parseInt(document.getElementById('hp-cur').value) || 0;
+            character.hp.max = parseInt(document.getElementById('hp-max').value) || 0;
+            character.mp.cur = parseInt(document.getElementById('mp-cur').value) || 0;
+            character.mp.max = parseInt(document.getElementById('mp-max').value) || 0;
+            character.san.cur = parseInt(document.getElementById('san-cur').value) || 0;
+            character.san.max = parseInt(document.getElementById('san-max').value) || 0;
+            character.mov = parseInt(document.getElementById('mov-val').value) || 0;
+
+            character.attributes.str = parseInt(document.getElementById('attr-str').value) || 0;
+            character.attributes.con = parseInt(document.getElementById('attr-con').value) || 0;
+            character.attributes.siz = parseInt(document.getElementById('attr-siz').value) || 0;
+            character.attributes.dex = parseInt(document.getElementById('attr-dex').value) || 0;
+            character.attributes.app = parseInt(document.getElementById('attr-app').value) || 0;
+            character.attributes.int = parseInt(document.getElementById('attr-int').value) || 0;
+            character.attributes.pow = parseInt(document.getElementById('attr-pow').value) || 0;
+            character.attributes.edu = parseInt(document.getElementById('attr-edu').value) || 0;
+            character.attributes.luck = parseInt(document.getElementById('attr-luck').value) || 0;
+        }
+
+        function updateSkillVal(index, val) {
+            character.skills[index].value = parseInt(val) || 0;
+            broadcastMyState();
+        }
+
+        function adjustStat(statName, amount) {
+            character[statName].cur = Math.max(0, character[statName].cur + amount);
+            broadcastMyState();
+        }
+
+        function addSkill() {
+            const name = document.getElementById('new-skill-name').value.trim();
+            const val = parseInt(document.getElementById('new-skill-val').value);
+            if (!name || isNaN(val)) return alert("请填写完整的技能名称和数值！");
+            character.skills.push({ name, value: val });
+            document.getElementById('new-skill-name').value = '';
+            document.getElementById('new-skill-val').value = '';
+            broadcastMyState();
+        }
+
+        function deleteSkill(index) {
+            character.skills.splice(index, 1);
+            broadcastMyState();
+        }
+
+        function addItem() {
+            const name = document.getElementById('item-name').value.trim();
+            const type = document.getElementById('item-type').value;
+            const desc = document.getElementById('item-desc').value.trim();
+            if (!name) return alert("请填写名称！");
+            character.inventory.push({ name, type, desc });
+            document.getElementById('item-name').value = '';
+            document.getElementById('item-desc').value = '';
+            broadcastMyState();
+        }
+
+        function deleteItem(index) {
+            character.inventory.splice(index, 1);
+            broadcastMyState();
+        }
+
+        // 渲染左侧队友监控栏
+        function renderPartyList() {
+            const container = document.getElementById('party-list');
+            let html = `
+                <div class="bg-slate-950 border border-amber-500/40 p-2.5 rounded space-y-1">
+                    <div class="flex justify-between font-bold text-amber-400">
+                        <span>${character.name} (自己)</span>
+                    </div>
+                    <div class="grid grid-cols-3 gap-1 text-[11px] text-slate-300">
+                        <span class="text-red-400">HP: ${character.hp.cur}/${character.hp.max}</span>
+                        <span class="text-blue-400">MP: ${character.mp.cur}/${character.mp.max}</span>
+                        <span class="text-purple-400">SAN: ${character.san.cur}/${character.san.max}</span>
+                    </div>
+                </div>
+            `;
+
+            let count = 0;
+            for (let id in allPartyMembers) {
+                const p = allPartyMembers[id];
+                count++;
+                html += `
+                    <div class="bg-slate-950 border border-slate-800 p-2.5 rounded space-y-1">
+                        <div class="flex justify-between font-bold text-slate-200">
+                            <span>${p.name}</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-1 text-[11px] text-slate-300">
+                            <span class="text-red-400">HP: ${p.hp.cur}/${p.hp.max}</span>
+                            <span class="text-blue-400">MP: ${p.mp.cur}/${p.mp.max}</span>
+                            <span class="text-purple-400">SAN: ${p.san.cur}/${p.san.max}</span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (count === 0) {
+                html += `<div class="text-slate-500 text-center py-2 text-xs">房间内暂无其他队友</div>`;
+            }
+            container.innerHTML = html;
+        }
+
+        // 弹窗控制
+        function openRollModal(skillName, skillVal) {
+            activeSkillForRoll = { name: skillName, value: skillVal };
+            document.getElementById('modal-title').innerText = `技能鉴定：${skillName} (${skillVal})`;
+            document.getElementById('dice-modal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('dice-modal').classList.add('hidden');
+        }
+
+        function openSanCheckModal() {
+            document.getElementById('san-modal').classList.remove('hidden');
+        }
+
+        function closeSanModal() {
+            document.getElementById('san-modal').classList.add('hidden');
+        }
+
+        // 技能鉴定（支持惩罚骰、普通、奖励骰）
+        function executeRoll(mode) {
+            closeModal();
+            playDiceSound();
+
+            const skill = activeSkillForRoll;
+            let roll = 0;
+            let rollDescText = "";
+            const units = Math.floor(Math.random() * 10);
+            
+            if (mode === 'normal') {
+                const tens = Math.floor(Math.random() * 10);
+                roll = tens * 10 + units;
+                if (roll === 0) roll = 100;
+                rollDescText = `普通骰 [${roll}]`;
+            } else if (mode === 'bonus') {
+                const t1 = Math.floor(Math.random() * 10);
+                const t2 = Math.floor(Math.random() * 10);
+                const minT = Math.min(t1, t2);
+                roll = minT * 10 + units;
+                if (roll === 0) roll = 100;
+                rollDescText = `奖励骰(十位:${t1},${t2} 取${minT}) ➔ [${roll}]`;
+            } else if (mode === 'penalty') {
+                const t1 = Math.floor(Math.random() * 10);
+                const t2 = Math.floor(Math.random() * 10);
+                const maxT = Math.max(t1, t2);
+                roll = maxT * 10 + units;
+                if (roll === 0) roll = 100;
+                rollDescText = `惩罚骰(十位:${t1},${t2} 取${maxT}) ➔ [${roll}]`;
+            }
+
+            const extreme = Math.floor(skill.value / 5);
+            const hard = Math.floor(skill.value / 2);
+            let resultText = "";
+            let colorClass = "text-slate-300";
+
+            let fumbleLimit = skill.value < 50 ? 96 : 100;
+            if (roll >= fumbleLimit) {
+                resultText = "大失败！";
+                colorClass = "text-red-500 font-bold";
+            } else if (roll === 1 || (skill.value >= 50 && roll <= 1)) {
+                resultText = "大成功！！";
+                colorClass = "text-amber-400 font-bold";
+            } else if (roll <= extreme) {
+                resultText = "极难成功！";
+                colorClass = "text-purple-400 font-bold";
+            } else if (roll <= hard) {
+                resultText = "困难成功！";
+                colorClass = "text-blue-400 font-bold";
+            } else if (roll <= skill.value) {
+                resultText = "普通成功";
+                colorClass = "text-green-400";
+            } else {
+                resultText = "失败";
+                colorClass = "text-slate-400";
+            }
+
+            const htmlLog = `
+                <div class="border-b border-slate-900 pb-1">
+                    <span class="text-amber-500">[${character.name}]</span> 
+                    进行了 <span class="text-white">${skill.name}</span>(${skill.value}) 鉴定<br>
+                    ${rollDescText} ➔ <span class="${colorClass}">${resultText}</span>
+                </div>
+            `;
+            appendDiceLogDirect(htmlLog);
+            sendPayload({ type: 'DICE_LOG', htmlContent: htmlLog });
+        }
+
+        // SAN Check
+        function executeSanCheck() {
+            closeSanModal();
+            playDiceSound();
+
+            const roll = Math.floor(Math.random() * 100) + 1;
+            const sanVal = character.san.cur;
+            const isSuccess = roll <= sanVal;
+            let resultDesc = isSuccess ? "成功 (理智保持)" : "失败 (理智受损)";
+            let color = isSuccess ? "text-green-400" : "text-red-400";
+
+            const htmlLog = `
+                <div class="border-b border-slate-900 pb-1">
+                    <span class="text-purple-400 font-bold">[SAN CHECK]</span> 
+                    <span class="text-amber-500">${character.name}</span> (SAN: ${sanVal})<br>
+                    投出: <span class="text-cyan-400">${roll}</span> ➔ <span class="${color}">${resultDesc}</span>
+                </div>
+            `;
+            appendDiceLogDirect(htmlLog);
+            sendPayload({ type: 'DICE_LOG', htmlContent: htmlLog });
+        }
+
+        // 自定义掷骰功能（支持 rd100, 3d6 等）
+        function rollCustomDice() {
+            const expr = document.getElementById('custom-dice-expr').value.trim().toLowerCase();
+            playDiceSound();
+
+            let total = 0;
+            let detail = "";
+
+            if (expr.includes('d')) {
+                const parts = expr.split('d');
+                const count = parseInt(parts[0]) || 1;
+                const sides = parseInt(parts[1]) || 100;
+                let rolls = [];
+                for (let i = 0; i < count; i++) {
+                    const r = Math.floor(Math.random() * sides) + 1;
+                    rolls.push(r);
+                    total += r;
+                }
+                detail = `${count}d${sides} [${rolls.join(', ')}]`;
+            } else {
+                total = parseInt(expr) || 100;
+                detail = `固定值 ${total}`;
+            }
+
+            const htmlLog = `
+                <div class="border-b border-slate-900 pb-1">
+                    <span class="text-amber-500">[${character.name}]</span> 进行了自定义掷骰<br>
+                    表达式 <span class="text-white">${expr}</span> ➔ 结果: <span class="text-cyan-400 font-bold text-sm">${total}</span> <span class="text-slate-500 text-[10px]">(${detail})</span>
+                </div>
+            `;
+            appendDiceLogDirect(htmlLog);
+            sendPayload({ type: 'DICE_LOG', htmlContent: htmlLog });
+        }
+
+        function appendDiceLogDirect(htmlContent) {
+            const logBox = document.getElementById('dice-log');
+            if (logBox.children.length === 1 && logBox.children[0].classList.contains('text-center')) {
+                logBox.innerHTML = '';
+            }
+            logBox.innerHTML += htmlContent;
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        function switchTab(tabName) {
+            const mainTab = document.getElementById('tab-main');
+            const invTab = document.getElementById('tab-inventory');
+            const btnMain = document.getElementById('btn-main');
+            const btnInv = document.getElementById('btn-inventory');
+
+            if (tabName === 'main') {
+                mainTab.classList.remove('hidden');
+                invTab.classList.add('hidden');
+                btnMain.className = "px-3 py-1.5 bg-amber-600 text-sm font-medium rounded cursor-pointer transition";
+                btnInv.className = "px-3 py-1.5 bg-slate-800 text-sm font-medium rounded cursor-pointer transition hover:bg-slate-700";
+            } else {
+                mainTab.classList.add('hidden');
+                invTab.classList.remove('hidden');
+                btnInv.className = "px-3 py-1.5 bg-amber-600 text-sm font-medium rounded cursor-pointer transition";
+                btnMain.className = "px-3 py-1.5 bg-slate-800 text-sm font-medium rounded cursor-pointer transition hover:bg-slate-700";
+            }
+        }
+
+        // 初始化
+        render();
+        initSyncChannel();
+        renderPartyList();
+    </script>
+</body>
+</html>
